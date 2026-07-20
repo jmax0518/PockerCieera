@@ -12,6 +12,10 @@ VALIDATOR_ENV_DIR="${VALIDATOR_ENV_DIR:-validator_env}"
 VALIDATOR_EXTRA_ARGS="${VALIDATOR_EXTRA_ARGS:-}"
 TARGET_BRANCH="${TARGET_BRANCH:-main}"
 VALIDATOR_SCRIPT="${VALIDATOR_SCRIPT:-./neurons/validator.py}"
+SAFE_BITTENSOR_CLI_VERSION="${SAFE_BITTENSOR_CLI_VERSION:-9.23.2}"
+SAFE_BITTENSOR_WALLET_VERSION="${SAFE_BITTENSOR_WALLET_VERSION:-4.1.0}"
+SAFE_BITTENSOR_SDK_MIN_VERSION="${SAFE_BITTENSOR_SDK_MIN_VERSION:-10.3.0}"
+SAFE_BITTENSOR_SDK_MAX_MAJOR="${SAFE_BITTENSOR_SDK_MAX_MAJOR:-11}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
@@ -36,6 +40,91 @@ echo "[INFO] Branch: $TARGET_BRANCH"
 echo "[INFO] Process: $PROCESS_NAME"
 echo "[INFO] Python: $PYTHON_BIN"
 echo "[INFO] Current commit: $(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+
+install_runtime_bittensor_stack() {
+  echo "[INFO] Installing runtime-431 compatible Bittensor SDK, CLI, and wallet versions..."
+  "$PYTHON_BIN" -m pip uninstall -y scalecodec >/dev/null 2>&1 || true
+  "$PYTHON_BIN" -m pip install \
+    "bittensor>=${SAFE_BITTENSOR_SDK_MIN_VERSION},<${SAFE_BITTENSOR_SDK_MAX_MAJOR}" \
+    "bittensor-cli==${SAFE_BITTENSOR_CLI_VERSION}" \
+    "bittensor-wallet==${SAFE_BITTENSOR_WALLET_VERSION}"
+  "$PYTHON_BIN" -m pip uninstall -y scalecodec >/dev/null 2>&1 || true
+  "$PYTHON_BIN" -m pip install --force-reinstall "cyscale==0.5.0"
+}
+
+guard_runtime_bittensor_stack() {
+  echo "[INFO] Verifying runtime-431 Bittensor package versions..."
+  "$PYTHON_BIN" - <<'PY'
+from importlib import metadata
+from os import environ
+from sys import exit
+
+safe_cli = environ.get("SAFE_BITTENSOR_CLI_VERSION", "9.23.2")
+safe_wallet = environ.get("SAFE_BITTENSOR_WALLET_VERSION", "4.1.0")
+safe_sdk_min_raw = environ.get("SAFE_BITTENSOR_SDK_MIN_VERSION", "10.3.0")
+safe_sdk_max_major = int(environ.get("SAFE_BITTENSOR_SDK_MAX_MAJOR", "11"))
+blocked = {
+    "bittensor-cli": "9.18.2",
+    "bittensor-wallet": "4.0.2",
+}
+
+packages = {}
+for name in ("bittensor", "bittensor-cli", "bittensor-wallet", "scalecodec"):
+    try:
+        packages[name] = metadata.version(name)
+    except metadata.PackageNotFoundError:
+        packages[name] = None
+
+def version_tuple(value):
+    parts = []
+    for raw in str(value or "").replace("-", ".").split("."):
+        if raw.isdigit():
+            parts.append(int(raw))
+        else:
+            break
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+safe_sdk_min = version_tuple(safe_sdk_min_raw)
+for name, blocked_version in blocked.items():
+    if packages[name] == blocked_version:
+        print(f"Blocked version installed: {name}=={blocked_version}")
+        exit(1)
+
+sdk_version = version_tuple(packages["bittensor"])
+if packages["bittensor"] is None or sdk_version < safe_sdk_min or sdk_version[0] >= safe_sdk_max_major:
+    print(
+        "Bittensor SDK version is not compatible with the Bittensor 431 runtime:",
+        f"bittensor=={packages['bittensor']}",
+        f"required: bittensor>={safe_sdk_min_raw},<{safe_sdk_max_major}",
+    )
+    exit(1)
+
+if packages["scalecodec"] is not None:
+    print(
+        "Legacy scalecodec is installed and conflicts with the runtime-431 compatible cyscale stack.",
+        "Run: pip uninstall -y scalecodec && pip install --force-reinstall cyscale==0.5.0",
+    )
+    exit(1)
+
+if packages["bittensor-cli"] != safe_cli or packages["bittensor-wallet"] != safe_wallet:
+    print(
+        "Unexpected Bittensor package versions:",
+        f"bittensor=={packages['bittensor']}",
+        f"bittensor-cli=={packages['bittensor-cli']}",
+        f"bittensor-wallet=={packages['bittensor-wallet']}",
+    )
+    exit(1)
+
+print(
+    "Verified pinned Bittensor package versions:",
+    f"bittensor=={packages['bittensor']}",
+    f"bittensor-cli=={packages['bittensor-cli']}",
+    f"bittensor-wallet=={packages['bittensor-wallet']}",
+)
+PY
+}
 
 pushd "$REPO_ROOT" > /dev/null
 git config --local core.fileMode false || true
@@ -72,6 +161,8 @@ if [ -f "$REPO_ROOT/requirements.txt" ]; then
   "$PYTHON_BIN" -m pip install -r "$REPO_ROOT/requirements.txt"
 fi
 "$PYTHON_BIN" -m pip install -e "$REPO_ROOT"
+install_runtime_bittensor_stack
+guard_runtime_bittensor_stack
 
 if [ -f "$REPO_ROOT/.env" ]; then
   set -a

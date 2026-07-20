@@ -108,7 +108,12 @@ Rules:
 
 - length of `risk_scores` must equal number of received chunks;
 - each score should be in `[0, 1]`;
-- `predictions` should align one-to-one with `risk_scores` when provided.
+- `predictions` should align one-to-one with `risk_scores` when provided;
+- `risk_scores` should be operational risk scores, not only a rank ordering
+  compressed below the `0.5` decision threshold. On mixed labeled evaluation
+  windows, validators may apply threshold sanity checks so a miner that never
+  emits positive decisions can lose calibration quality even when its AP is
+  strong.
 
 The reference miner treats each chunk as one scoring unit and returns:
 
@@ -124,7 +129,9 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -e .
-pip install bittensor-cli
+pip uninstall -y scalecodec
+pip install -U "bittensor>=10.3.0,<11" bittensor-cli==9.23.2 bittensor-wallet==4.1.0
+pip install --force-reinstall cyscale==0.5.0
 ```
 
 Or use:
@@ -136,6 +143,16 @@ Or use:
 ## Wallet and Registration
 
 `btcli` is provided by the separate `bittensor-cli` package.
+
+The Bittensor 431 runtime upgrade is breaking for SDK clients older than `10.3.0`.
+If you see metadata or metagraph decode errors such as `Invalid type for data` or
+`TypeDefComposite`, upgrade with:
+
+```bash
+pip uninstall -y scalecodec
+pip install -U "bittensor>=10.3.0,<11" bittensor-cli==9.23.2 bittensor-wallet==4.1.0
+pip install --force-reinstall cyscale==0.5.0
+```
 
 ```bash
 btcli wallet new_coldkey --wallet.name my_cold

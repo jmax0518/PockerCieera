@@ -2,8 +2,10 @@
 # setup.sh - Setup Poker44 validator environment
 set -e
 
-SAFE_BITTENSOR_CLI_VERSION="9.20.0"
-SAFE_BITTENSOR_WALLET_VERSION="4.0.1"
+SAFE_BITTENSOR_CLI_VERSION="9.23.2"
+SAFE_BITTENSOR_WALLET_VERSION="4.1.0"
+SAFE_BITTENSOR_SDK_MIN_VERSION="10.3.0"
+SAFE_BITTENSOR_SDK_MAX_MAJOR="11"
 BLOCKED_BITTENSOR_CLI_VERSION="9.18.2"
 BLOCKED_BITTENSOR_WALLET_VERSION="4.0.2"
 
@@ -72,9 +74,14 @@ install_modules() {
 }
 
 install_bittensor_cli() {
-  info_msg "Installing pinned Bittensor CLI and wallet versions..."
-  pip install "bittensor-cli==${SAFE_BITTENSOR_CLI_VERSION}" "bittensor-wallet==${SAFE_BITTENSOR_WALLET_VERSION}" \
+  info_msg "Installing runtime-431 compatible Bittensor SDK, CLI, and wallet versions..."
+  pip uninstall -y scalecodec >/dev/null 2>&1 || true
+  pip install "bittensor>=${SAFE_BITTENSOR_SDK_MIN_VERSION},<${SAFE_BITTENSOR_SDK_MAX_MAJOR}" \
+    "bittensor-cli==${SAFE_BITTENSOR_CLI_VERSION}" "bittensor-wallet==${SAFE_BITTENSOR_WALLET_VERSION}" \
     || handle_error "Failed to install pinned Bittensor packages"
+  pip uninstall -y scalecodec >/dev/null 2>&1 || true
+  pip install --force-reinstall "cyscale==0.5.0" \
+    || handle_error "Failed to repair cyscale after removing legacy scalecodec"
   success_msg "Pinned Bittensor packages installed."
 }
 
@@ -84,28 +91,58 @@ guard_bittensor_versions() {
 from importlib import metadata
 from sys import exit
 
-safe_cli = "9.20.0"
-safe_wallet = "4.0.1"
+safe_cli = "9.23.2"
+safe_wallet = "4.1.0"
+safe_sdk_min = (10, 3, 0)
+safe_sdk_max_major = 11
 blocked = {
     "bittensor-cli": "9.18.2",
     "bittensor-wallet": "4.0.2",
 }
 
 packages = {}
-for name in ("bittensor-cli", "bittensor-wallet"):
+for name in ("bittensor", "bittensor-cli", "bittensor-wallet", "scalecodec"):
     try:
         packages[name] = metadata.version(name)
     except metadata.PackageNotFoundError:
         packages[name] = None
+
+def version_tuple(value):
+    parts = []
+    for raw in str(value or "").replace("-", ".").split("."):
+        if raw.isdigit():
+            parts.append(int(raw))
+        else:
+            break
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
 
 for name, blocked_version in blocked.items():
     if packages[name] == blocked_version:
         print(f"Blocked version installed: {name}=={blocked_version}")
         exit(1)
 
+sdk_version = version_tuple(packages["bittensor"])
+if packages["bittensor"] is None or sdk_version < safe_sdk_min or sdk_version[0] >= safe_sdk_max_major:
+    print(
+        "Bittensor SDK version is not compatible with the Bittensor 431 runtime:",
+        f"bittensor=={packages['bittensor']}",
+        "required: bittensor>=10.3.0,<11",
+    )
+    exit(1)
+
+if packages["scalecodec"] is not None:
+    print(
+        "Legacy scalecodec is installed and conflicts with the runtime-431 compatible cyscale stack.",
+        "Run: pip uninstall -y scalecodec && pip install --force-reinstall cyscale==0.5.0",
+    )
+    exit(1)
+
 if packages["bittensor-cli"] != safe_cli or packages["bittensor-wallet"] != safe_wallet:
     print(
         "Unexpected Bittensor package versions:",
+        f"bittensor=={packages['bittensor']}",
         f"bittensor-cli=={packages['bittensor-cli']}",
         f"bittensor-wallet=={packages['bittensor-wallet']}",
     )
@@ -113,6 +150,7 @@ if packages["bittensor-cli"] != safe_cli or packages["bittensor-wallet"] != safe
 
 print(
     "Verified pinned Bittensor package versions:",
+    f"bittensor=={packages['bittensor']}",
     f"bittensor-cli=={packages['bittensor-cli']}",
     f"bittensor-wallet=={packages['bittensor-wallet']}",
 )
