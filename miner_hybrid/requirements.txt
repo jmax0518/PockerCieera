@@ -1,0 +1,6 @@
+# Hybrid miner training/serving extras (CPU). Parent repo requirements still apply.
+joblib>=1.3
+scikit-learn>=1.3
+numpy>=1.24
+requests>=2.31
+lightgbm>=4.0

@@ -212,3 +212,10 @@ hands_for_validator/poker_hands_from_rar.json
 
 # Local Weights & Biases runs/artifacts
 wandb/
+kings_analysis/
+
+# Hybrid miner local data/artifacts
+miner_hybrid/data/
+miner_hybrid/models/*.joblib
+!miner_hybrid/models/.gitkeep
+miner_hybrid/**/__pycache__/

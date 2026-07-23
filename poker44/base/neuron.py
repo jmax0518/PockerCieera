@@ -62,9 +62,10 @@ class BaseNeuron(ABC):
         return ttl_get_block(self)
 
     def __init__(self, config=None):
-        base_config = copy.deepcopy(config or BaseNeuron.config())
-        self.config = self.config()
-        self.config.merge(base_config)
+        # Parse CLI once via the concrete subclass (Miner/Validator.add_args).
+        # Avoid BaseNeuron.config() + merge, which can wipe wallet/axon settings
+        # under Bittensor >=10.5 config trees.
+        self.config = copy.deepcopy(config) if config is not None else self.config()
         self.check_config(self.config) 
 
         # Version check
