@@ -218,4 +218,5 @@ kings_analysis/
 miner_hybrid/data/
 miner_hybrid/models/*.joblib
 !miner_hybrid/models/.gitkeep
+!miner_hybrid/models/hybrid_v1.joblib
 miner_hybrid/**/__pycache__/
