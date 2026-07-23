@@ -12,9 +12,9 @@ export POKER44_MODEL_PATH="${POKER44_MODEL_PATH:-$HYB/models/hybrid_v1.joblib}"
 # Public model identity (Poker44 manifest / dashboard)
 export POKER44_MODEL_OPEN_SOURCE=1
 export POKER44_MODEL_REPO_URL="${POKER44_MODEL_REPO_URL:-https://github.com/jmax0518/PockerCieera}"
-export POKER44_MODEL_REPO_COMMIT="${POKER44_MODEL_REPO_COMMIT:-3e375176cbc49e565c1a7e93c4ce93b73a21f3cb}"
+export POKER44_MODEL_REPO_COMMIT="${POKER44_MODEL_REPO_COMMIT:-0a3562fe5fd26c5f2e7ef18ad7db56a7f6b93a86}"
 export POKER44_MODEL_NAME="${POKER44_MODEL_NAME:-poker44-hybrid-v1}"
-export POKER44_MODEL_VERSION="${POKER44_MODEL_VERSION:-1.2.0-safety}"
+export POKER44_MODEL_VERSION="${POKER44_MODEL_VERSION:-1.3.0-30d}"
 
 # Also set env fallbacks used by poker44.utils.config._ensure_neuron_config
 export WALLET_NAME="${WALLET_NAME:-VPS-3-SECURE}"
